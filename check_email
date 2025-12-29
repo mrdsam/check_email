@@ -112,13 +112,10 @@ class ImapConnection(object):
 
         if match:
             email_server_date_as_unix = match.group(1)
-            email_server_date_as_unix = email.utils.mktime_tz(
-                email.utils.parsedate_tz(
-                    email_server_date_as_unix))
+            return email.utils.mktime_tz(
+                    email.utils.parsedate_tz(email_server_date_as_unix))
         else:
-            received = int(time.time())
-
-        return email_server_date_as_unix
+            return int(time.time())
 
     def search_mail(self, warning, critical, cleanup_time):
         # time_crit defines the critical threshold
