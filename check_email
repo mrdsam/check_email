@@ -414,8 +414,8 @@ def main():
     except smtplib.SMTPAuthenticationError as a:
         plugin_exit('SMTP Authentication Error: %s' % a[1],
                     ResultStatus.UNKNOWN)
-    except gaierror as g:
-        plugin_exit('SMTP Host "%s" not reachable' % conn_smtp.host,
+    except gaierror as exc:
+        plugin_exit('SMTP Host "%s" not reachable: %s' % (conn_smtp.host, exc),
                     ResultStatus.UNKNOWN)
     except smtplib.SMTPSenderRefused:
         plugin_exit('SMTP sender has an invalid email address',
