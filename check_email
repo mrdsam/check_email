@@ -434,9 +434,10 @@ def main():
     except smtplib.SMTPRecipientsRefused:
         plugin_exit('SMTP receiver has an invalid email address',
                     STATUS_UNKNOWN)
-    except socket.timeout:
-        plugin_exit('SMTP Connection timeout',
-                    STATUS_UNKNOWN)
+    except smtplib.SMTPServerDisconnected:
+        plugin_exit('SMTP server disconnected', STATUS_UNKNOWN)
+    except (socket.timeout, TimeoutError):
+        plugin_exit('SMTP Connection timeout', STATUS_UNKNOWN)
 
     else:
         # Search email on remote IMAP
