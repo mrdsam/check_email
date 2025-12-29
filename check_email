@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
 
-try:
-    import sys
-    import smtplib
-    import imaplib
-    import random
-    import string
-    import time
-    import argparse
-    import os
-    import email.utils
-    import email.message
-    import email.header
-    import re
-    import socket
-    import traceback
+import argparse
+import email.header
+import email.message
+import email.utils
+import imaplib
+import os
+import random
+import re
+import smtplib
+import socket
+import string
+import sys
+import time
+import traceback
+from email.mime.text import MIMEText
+from socket import gaierror
 
-    from email.mime.text import MIMEText
-    from socket import gaierror
-except Exception as e:
-    print("UNKNOWN: Failure during import: %s" % str(e))
-    sys.exit(3)
 
 __version__ = '0.1.0'
 
