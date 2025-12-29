@@ -4,6 +4,7 @@ import argparse
 import email.header
 import email.message
 import email.utils
+import enum
 import imaplib
 import os
 import random
@@ -20,17 +21,17 @@ from socket import gaierror
 
 __version__ = '0.1.0'
 
-# Icinga states
-STATUS_OK = 0
-STATUS_WARNING = 1
-STATUS_CRITICAL = 2
-STATUS_UNKNOWN = 3
-STATUS_NAMES = [
-    'OK',
-    'WARNING',
-    'CRITICAL',
-    'UNKNOWN',
-]
+
+class ResultStatus(enum.Enum):
+    """Magic words used by Icinga for determining the result of a check."""
+
+    # Each item value contains the magic string expected by icinga and the
+    # corresponding exit code.
+    OK = ("OK", 0)
+    WARNING = ("WARNING", 1)
+    CRITICAL = ("CRITICAL", 2)
+    UNKNOWN = ("UNKNOWN", 3)
+
 
 PORT_IMAP = 143
 PORT_IMAPS = 993
@@ -39,11 +40,10 @@ PORT_SMTPS = 465
 # PORT_SMTPS = 587
 
 
-def plugin_exit(label, state=STATUS_UNKNOWN, perfdata=None, name='check_email'):
-    if state > len(STATUS_NAMES):
-        raise RuntimeError('State programming error')
+def plugin_exit(label, state: ResultStatus, perfdata=None, name='check_email'):
+    state_name, state_exitcode = state.value
 
-    print('%s - %s: %s' % (STATUS_NAMES[state], name, str(label)))
+    print('%s - %s: %s' % (state_name, name, str(label)))
 
     if perfdata:
         output = '|'
@@ -51,7 +51,7 @@ def plugin_exit(label, state=STATUS_UNKNOWN, perfdata=None, name='check_email'):
             output += " '%s'=%s" % (key, value)
         print(output)
 
-    sys.exit(state)
+    sys.exit(state_exitcode)
 
 
 class ImapConnection(object):
@@ -156,12 +156,12 @@ class ImapConnection(object):
                     email_server_date_as_unix = self.parse_received(raw_email['Received'])
 
                     if time.time() > time_warn:
-                        return STATUS_WARNING, email_server_date_as_unix
+                        return ResultStatus.WARNING, email_server_date_as_unix
 
-                    return STATUS_OK, email_server_date_as_unix
+                    return ResultStatus.OK, email_server_date_as_unix
 
             if time.time() > time_crit:
-                return STATUS_CRITICAL, None
+                return ResultStatus.CRITICAL, None
             else:
                 time.sleep(2)
 
@@ -390,10 +390,10 @@ def main():
     try:
         parsed = parse_arguments()
     except argparse.ArgumentError as err:
-        plugin_exit('Error in arguments: %s' % err, STATUS_UNKNOWN)
+        plugin_exit('Error in arguments: %s' % err, ResultStatus.UNKNOWN)
 
-    state_remote_imap = STATUS_UNKNOWN
-    state_reply_imap = STATUS_UNKNOWN
+    state_remote_imap = ResultStatus.UNKNOWN
+    state_reply_imap = ResultStatus.UNKNOWN
     pluginoutput = ''
 
     # First block test the SMTP 'connection', 'authentication' and 'socket'.
@@ -413,23 +413,23 @@ def main():
 
     except smtplib.SMTPConnectError as err:
         plugin_exit('SMTP Connection Error: %s' % err[1],
-                    STATUS_UNKNOWN)
+                    ResultStatus.UNKNOWN)
     except smtplib.SMTPAuthenticationError as a:
         plugin_exit('SMTP Authentication Error: %s' % a[1],
-                    STATUS_UNKNOWN)
+                    ResultStatus.UNKNOWN)
     except gaierror as g:
         plugin_exit('SMTP Host "%s" not reachable' % conn_smtp.host,
-                    STATUS_UNKNOWN)
+                    ResultStatus.UNKNOWN)
     except smtplib.SMTPSenderRefused:
         plugin_exit('SMTP sender has an invalid email address',
-                    STATUS_UNKNOWN)
+                    ResultStatus.UNKNOWN)
     except smtplib.SMTPRecipientsRefused:
         plugin_exit('SMTP receiver has an invalid email address',
-                    STATUS_UNKNOWN)
+                    ResultStatus.UNKNOWN)
     except smtplib.SMTPServerDisconnected:
-        plugin_exit('SMTP server disconnected', STATUS_UNKNOWN)
+        plugin_exit('SMTP server disconnected', ResultStatus.UNKNOWN)
     except (socket.timeout, TimeoutError):
-        plugin_exit('SMTP Connection timeout', STATUS_UNKNOWN)
+        plugin_exit('SMTP Connection timeout', ResultStatus.UNKNOWN)
 
     else:
         # Search email on remote IMAP
@@ -449,8 +449,8 @@ def main():
                                                           parsed.cleanup_time)
 
             # TODO: Refactor
-            if (state_received[0] == STATUS_CRITICAL):
-                plugin_exit('Email cloud not be fetched', STATUS_CRITICAL)
+            if (state_received[0] == ResultStatus.CRITICAL):
+                plugin_exit('Email could not be fetched', ResultStatus.CRITICAL)
             else:
                 dts = state_received[1]
                 try:
@@ -463,11 +463,11 @@ def main():
                         dts = time_send
                         # convert string to time/ts
                 time_delta_received = dts - time_send
-                if (state_received[0] == STATUS_WARNING):
+                if (state_received[0] == ResultStatus.WARNING):
                     pluginoutput = '%s took %ds to receive mail' % (conn_remote_imap.host, time_delta_received)
-                    state_remote_imap = STATUS_WARNING
-                elif (state_received[0] == STATUS_OK):
-                    state_remote_imap = STATUS_OK
+                    state_remote_imap = ResultStatus.WARNING
+                elif (state_received[0] == ResultStatus.OK):
+                    state_remote_imap = ResultStatus.OK
 
             if parsed.echo_reply is False:
                 pluginoutput += "%s - Email received in %ds" % (conn_remote_imap.host, time_delta_received)
@@ -478,14 +478,12 @@ def main():
             conn_remote_imap.disconnect_imap()
 
         except imaplib.IMAP4.error as err:
-            plugin_exit('IMAP: %s' % err,
-                        STATUS_UNKNOWN)
+            plugin_exit('IMAP: %s' % err, ResultStatus.UNKNOWN)
         except gaierror as g:
             plugin_exit('IMAP Host "%s" not reachable: %s' % (conn_remote_imap.host, g),
-                        STATUS_UNKNOWN)
+                        ResultStatus.UNKNOWN)
         except socket.timeout:
-            plugin_exit('IMAP Connection timeout',
-                        STATUS_UNKNOWN)
+            plugin_exit('IMAP Connection timeout', ResultStatus.UNKNOWN)
 
         else:
             if parsed.echo_reply:
@@ -505,19 +503,19 @@ def main():
                                                                parsed.cleanup_time)
 
                     # TODO: Refactor
-                    if (state_reply[0] == STATUS_CRITICAL):
+                    if (state_reply[0] == ResultStatus.CRITICAL):
                         plugin_exit('Reply email cloud not be fetched',
-                                    STATUS_CRITICAL)
-                    elif (state_reply[0] == STATUS_WARNING):
+                                    ResultStatus.CRITICAL)
+                    elif (state_reply[0] == ResultStatus.WARNING):
                         time_delta_reply = state_reply[1] - state_received[1]
                         time_delta_loop = time_delta_received + time_delta_reply
                         pluginoutput = '%s took %ds to reply' % (conn_remote_imap.host, time_delta_reply)
-                        state_reply_imap = STATUS_WARNING
-                    elif (state_reply[0] == STATUS_OK):
+                        state_reply_imap = ResultStatus.WARNING
+                    elif (state_reply[0] == ResultStatus.OK):
                         time_delta_reply = state_reply[1] - state_received[1]
                         time_delta_loop = time_delta_received + time_delta_reply
-                        state_reply_imap = STATUS_OK
-                        if state_remote_imap is not STATUS_WARNING:
+                        state_reply_imap = ResultStatus.OK
+                        if state_remote_imap is not ResultStatus.WARNING:
                             pluginoutput += "Email loop took %ds" % time_delta_loop
 
                     perfdata = {
@@ -534,15 +532,15 @@ def main():
                 except imaplib.IMAP4.error as err:
                     if str(err) == 'command SEARCH illegal in state AUTH, only allowed in states SELECTED':
                         plugin_exit('IMAP: Given Mailbox is not available',
-                                    STATUS_UNKNOWN)
+                                    ResultStatus.UNKNOWN)
                     else:
-                        plugin_exit('IMAP: %s' % err, STATUS_UNKNOWN)
+                        plugin_exit('IMAP: %s' % err, ResultStatus.UNKNOWN)
                 except gaierror as g:
                     plugin_exit('IMAP Host "%s" not reachable: %s' % (conn_remote_imap.host, g),
-                                STATUS_UNKNOWN)
+                                ResultStatus.UNKNOWN)
                 except socket.timeout:
                     plugin_exit('IMAP Connection Timeout',
-                                STATUS_UNKNOWN)
+                                ResultStatus.UNKNOWN)
 
                 max_state = max(state_remote_imap, state_reply_imap)
                 plugin_exit(pluginoutput, max_state, perfdata=perfdata)
