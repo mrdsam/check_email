@@ -39,15 +39,11 @@ PORT_SMTPS = 465
 # PORT_SMTPS = 587
 
 
-def plugin_exit(label, state=STATUS_UNKNOWN, lines=None, perfdata=None, name='check_email'):
+def plugin_exit(label, state=STATUS_UNKNOWN, perfdata=None, name='check_email'):
     if state > len(STATUS_NAMES):
         raise RuntimeError('State programming error')
 
     print('%s - %s: %s' % (STATUS_NAMES[state], name, str(label)))
-
-    if lines:
-        for line in lines:
-            print(line)
 
     if perfdata:
         output = '|'
@@ -549,9 +545,9 @@ def main():
                                 STATUS_UNKNOWN)
 
                 max_state = max(state_remote_imap, state_reply_imap)
-                plugin_exit(pluginoutput, max_state, [], perfdata)
+                plugin_exit(pluginoutput, max_state, perfdata=perfdata)
             else:
-                plugin_exit(pluginoutput, state_remote_imap, [], perfdata)
+                plugin_exit(pluginoutput, state_remote_imap, perfdata=perfdata)
 
 
 if __name__ == '__main__':
