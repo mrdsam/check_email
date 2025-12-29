@@ -19,7 +19,7 @@ try:
     from email.mime.text import MIMEText
     from socket import gaierror
 except Exception as e:
-    print("UNKNOWN: Failure during import: %s" % e.message)
+    print("UNKNOWN: Failure during import: %s" % str(e))
     sys.exit(3)
 
 __version__ = '0.1.0'
@@ -562,6 +562,6 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         trace = traceback.format_exc()
-        print("UNKNOWN: Python error: %s" % e.message)
+        print("UNKNOWN: Python error: %s" % str(e))
         print(trace)
         sys.exit(3)
